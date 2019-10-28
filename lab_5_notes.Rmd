@@ -9,3 +9,72 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+### Objectives:
+
+- Getting counts for different groups
+- Use the {lubridate} to parse dates
+- Find confidence intervals and do t-tests with t.test()
+- Heatmaps with geom_tile()
+
+### Intital Wrangling:
+```{r, include = FALSE}
+# Attach packages
+library(tidyverse)
+library(here)
+library(janitor)
+
+# Read in lobster data; from SB County LTER
+lobster_abundance <- read_csv(here("data", "lobster_abundance.csv"), # here indicates file path
+                              na = "-99999") %>%  # replaces the 9's with NAs
+  clean_names() # convert to lowercase_snake_case 
+
+```
+
+
+After importing, notice that the data isn't completely tidy because each observation is not a row - each lobster is an observation, so the count column aggregates observations together. This is a frequency table -> we want it in case/tidy format, meaning expanding the count column. 
+
+Use th tidyr::uncount() function to expand a frequency variable
+```{r}
+lobster_tidy <- lobster_abundance %>% 
+  uncount(lobster_count)
+```
+
+### Initial Visualizations:
+```{r}
+ggplot(data = lobster_tidy, aes(x = site, y = size_mm)) +
+  geom_jitter(aes(color = site), 
+              width = 0.2,
+              alpha = 0.3)
+
+ggplot(data = lobster_tidy, aes(x = site, y = size_mm)) +
+  geom_violin(aes(color = site),
+              alpha = 0.3)
+
+ggplot(data = lobster_tidy, aes(x = size_mm)) +
+  geom_histogram(aes(fill = site)) +
+  facet_wrap(~site)
+
+# Within facet_wrap() you can allow each of the panels to have a different scale, which is problematic if you are trying to compare across groups, but if you need to do that for a different reason, you can use "scales = FREE"
+
+ggplot(data = lobster_tidy, aes(x = size_mm)) +
+  geom_histogram(aes(fill = site)) +
+  facet_wrap(~site, scale = "free")
+```
+
+Are the lobster data normally distributed? Do they seem symmetric? Relatively bell-shaped? In general - they are relatively so, but we need to know more information about what it looks like.
+
+To assess normality: can use a quantile-quantile plot:
+```{r}
+ggplot(data = lobster_tidy, aes(sample = size_mm)) +
+  geom_qq() +
+  facet_wrap(~site, scale = "free")
+```
+
+Examining the qq-plots allows us to determine that for the most part, the data are normall distributed. There are a handful of outliers (ex: for the CARP site) but it's important to remember that the difference there might only be because of a few points that are too high (and we can see just how many it is later).
+
+In addition, there is a particularly high sample size, which also makes assuming normality more confident.
+
+### Parsing Dates:
+
+
+### Examining Counts:
