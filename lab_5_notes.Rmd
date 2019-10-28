@@ -76,5 +76,134 @@ In addition, there is a particularly high sample size, which also makes assuming
 
 ### Parsing Dates:
 
+Use {lubridate} to parse dates and times because the class of the date column is a character - R just recognizes it as strings. Add a new column with mutate() that contains the date as an actual date
+```{r}
+lobster_date <- lobster_tidy %>% 
+  mutate(
+    date_new = lubridate::mdy(date)
+  )
+```
+
+Also good for parsing dates (pulling out separate components) so you can examine them separately - like month, year, etc.
+
+What's especially cool is when you pull out the months, you can have them labeled with the actual month name, and it automatically knows that those months have a particular order - the class of them is "ordered" "factor"
+```{r}
+lobster_parse_date <- lobster_date %>% 
+  mutate(
+    obs_month = lubridate::month(date_new, 
+                                 label = TRUE), # lists with the actual month name
+    obs_year = lubridate::year(date_new)
+  )
+
+```
+
 
 ### Examining Counts:
+
+Count lobsters by different gropuings: dplyr::count() built to call group_by(), then do counts, then ungroup things when you're done. Multi-grouping tool that takes care of the groupings for you. 
+
+Count number of lobsters by year and month - essentially count says, groupby(this), summarize(this info) by getting the length of things, and then when you're done with then, go ahead and ungroup() those things in case I'd prefer to use other groupings later.
+```{r}
+lobster_ym <- lobster_parse_date %>% 
+  count(obs_year, obs_month)
+```
+
+Count by observation year and site
+```{r}
+lobster_ysite <- lobster_parse_date %>% 
+  count(obs_year, site)
+
+ggplot(data = lobster_ysite, aes(x = obs_year, y = n)) +
+  geom_col(aes(fill = site))
+
+
+lobster_site <- lobster_parse_date %>% 
+  count(site) # for all sites across all years
+
+
+# If you're looking to find numbers of observations to create a summary statistic, use group_by + summarize + n()
+lobster_summary <- lobster_parse_date %>% 
+  group_by(site) %>% 
+  summarize(
+    mean_size = mean(size_mm, na.rm = TRUE),
+    sd_size = sd(size_mm, na.rm = TRUE),
+    sample_n = n()
+  )
+
+```
+
+
+### Confidence intervals and t-tests
+
+#### One-sample t-test
+
+Use the 't.test()' function to find confidence intervals and perform t-tests
+```{r}
+ivee_lobsters <- lobster_tidy %>% 
+  filter(site == "IVEE") %>% 
+  pull(size_mm) # pulls out just the size_mm column and stores as a vector of values
+
+#t.test is built to calculate appropriate values based on how many vectors you give it
+t.test(ivee_lobsters) # default is whether or not the mean is zero
+
+```
+#### Confidence intervals
+
+Confidence interval = tells you about the sampling distribution... this 95% confidence interval tells you that based on your single sample mean & spread, if you were to take a bunch of samples from the population and look at their means, you'd expect them to fall in that range 95% of the time.
+
+#### Two sample t-test: exploring between sites
+
+Is there a significant difference in mean lobster lengths between Naples Reef and Mohawk Reef?
+
+```{r}
+napl_sample <- lobster_tidy %>% 
+  filter(site == "NAPL") %>% 
+  pull(size_mm)
+
+mohk_sample <- lobster_tidy %>% 
+  filter(site == "MOHK") %>% 
+  pull(size_mm)
+
+mohk_napl_ttest <- t.test(napl_sample, mohk_sample)
+
+mohk_napl_ttest
+
+# p-value is probability that two samples from populations with the same mean could be at least as different as the difference between the sample means found here due to random chance - more likely explanation is that these samples were drawn from populations with different means, aka the populations are significantly different...
+
+```
+
+If you want to write out a sentence with the values from this t-test, you can pull up ?t.test to look at the "values" section which explains how different values are stored. You can use the value name to reference that value in text (rather than copy/paste)
+
+Ex:
+
+Mean lobster size differed significantly between Mohawk and Naples reefs (t(`r mohk_napl_ttest$parameter`) = `r mohk_napl_ttest$statistic`)
+
+You want the values to be reported directly from the outcome so if you change anything upstream, it will be automatically updated downstream. Yay, inline referencing!
+
+
+Easier way to do a 2-sample t-test: moving towards model notation in R
+```{r}
+# Create data frame that only has two groups to compare:
+lobster_sample2 <- lobster_tidy %>% 
+  filter(site %in% c("NAPL", "MOHK"))
+
+
+# Run t-test using linear model notation:
+ttest_2 <- t.test(data = lobster_sample2, size_mm ~ site) # compare the sizes separated in groups by site (works b/c only 2)
+
+# Shows the exact same results as when run previously. Just a different way to do it.
+
+```
+
+
+### Make a geom_tile() heatmap!
+
+Heatmaps have two discrete variables on each axis, and the fill in the cell is based on the value for each section.
+
+```{r}
+ggplot(data = lobster_ysite, aes(x = obs_year, y = site)) +
+  geom_tile(aes(fill = n))
+```
+
+
+
